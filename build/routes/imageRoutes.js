@@ -11,7 +11,7 @@ const multer = __importStar(require("multer"));
 const multerS3 = __importStar(require("multer-s3"));
 const aws = __importStar(require("aws-sdk"));
 function imageRoutes(app) {
-    app.route('/image-upload/:userId').post((req, res) => {
+    app.route('/profile-image-upload/:userId').post((req, res) => {
         aws.config.update({
             accessKeyId: process.env.AWS_KEY_ID,
             secretAccessKey: process.env.AWS_SECRET,
@@ -42,6 +42,38 @@ function imageRoutes(app) {
             const pathParts = s3file.key.split('/');
             const fileName = pathParts[pathParts.length - 1];
             return res.status(200).json({ 'userId': userId, 'file': fileName, 'url': s3file.location });
+        });
+    });
+    app.route('/item-image-upload').post((req, res) => {
+        aws.config.update({
+            accessKeyId: process.env.AWS_KEY_ID,
+            secretAccessKey: process.env.AWS_SECRET,
+            region: process.env.AWS_REGION
+        });
+        const bucket = process.env.AWS_BUCKET;
+        const s3 = new aws.S3();
+        const environment = process.env.NODE_ENV;
+        const pathPrefix = 'items';
+        const upload = multer.default({
+            storage: multerS3.default({
+                s3: s3,
+                bucket: bucket,
+                acl: 'public-read',
+                key: function (req, file, cb) {
+                    cb(null, environment + '/' + pathPrefix + '/' + Date.now().toString() + '.' + getFileExtension(file.originalname));
+                }
+            })
+        });
+        const singleUpload = upload.single('image'); // image is the name of the field in the submitted form
+        singleUpload(req, res, (err) => {
+            if (err) {
+                console.log(err);
+                return res.status(422).json({ 'error': { 'type': 'Image Upload Error', 'message': err.message } });
+            }
+            const s3file = req.file; // TS type checking issue
+            const pathParts = s3file.key.split('/');
+            const fileName = pathParts[pathParts.length - 1];
+            return res.status(200).json({ 'file': fileName, 'url': s3file.location });
         });
     });
 }
